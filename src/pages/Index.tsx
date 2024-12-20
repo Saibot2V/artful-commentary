@@ -5,16 +5,11 @@ import { MessageInput } from "@/components/MessageInput";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { ImageWithPoints } from "@/components/ImageWithPoints";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { analyzeImage } from "@/services/imageAnalysis";
 
 interface Point {
   point: [number, number];
   label: string;
-}
-
-interface AnalysisResponse {
-  answer: string;
-  points?: Point[];
 }
 
 const Index = () => {
@@ -59,84 +54,22 @@ const Index = () => {
 
     setIsLoading(true);
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await analyzeImage(
+        apiKey,
+        modelName,
+        systemMessage,
+        uploadedImage,
+        message,
+        isPointMode
+      );
 
-      // Convert base64 image to File object
-      const base64Data = uploadedImage.split(',')[1];
-      const byteCharacters = atob(base64Data);
-      const byteArrays = [];
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteArrays.push(byteCharacters.charCodeAt(i));
-      }
-      const blob = new Blob([new Uint8Array(byteArrays)], { type: 'image/jpeg' });
-      const imageFile = new File([blob], 'image.jpg', { type: 'image/jpeg' });
-
-      // Prepare the prompt based on mode
-      let prompt = message;
-      if (isPointMode) {
-        prompt = `Answer the following question and point to relevant items in the image: '${message}'
-        Provide the answer in JSON format as follows:
-        {
-          "answer": "...",
-          "points": [{"point": [y, x], "label": "..."}],
-        }
-        The points are in [y, x] format normalized to 0-1000.`;
-      }
-
-      // Create chat session with configuration
-      const chat = model.startChat({
-        generationConfig: {
-          temperature: 1,
-          topP: 0.95,
-          topK: 40,
-          maxOutputTokens: 8192,
-        },
-        history: systemMessage ? [
-          {
-            role: "user",
-            parts: [{ text: systemMessage }],
-          }
-        ] : [],
-      });
-
-      // Send message with image
-      const result = await chat.sendMessage([
-        {
-          inlineData: {
-            data: base64Data,
-            mimeType: "image/jpeg"
-          }
-        },
-        { text: prompt }
-      ]);
-
-      const responseText = await result.response.text();
-
-      if (isPointMode) {
-        try {
-          const parsedResponse = JSON.parse(responseText) as AnalysisResponse;
-          setResponse(parsedResponse.answer);
-          setPoints(parsedResponse.points || []);
-        } catch (error) {
-          console.error("Failed to parse points response:", error);
-          setResponse(responseText);
-          setPoints([]);
-          toast({
-            title: "Warning",
-            description: "Could not parse points from response. Displaying text only.",
-            variant: "destructive",
-          });
-        }
-      } else {
-        setResponse(responseText);
-        setPoints([]);
-      }
+      setResponse(result.answer);
+      setPoints(result.points || []);
     } catch (error) {
       console.error("API Error:", error);
       toast({
         title: "Error",
-        description: "An error occurred while processing your request.",
+        description: error instanceof Error ? error.message : "An error occurred while processing your request.",
         variant: "destructive",
       });
     } finally {
