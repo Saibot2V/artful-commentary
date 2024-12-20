@@ -5,6 +5,7 @@ import { MessageInput } from "@/components/MessageInput";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { ImageWithPoints } from "@/components/ImageWithPoints";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 interface Point {
   point: [number, number];
@@ -58,33 +59,87 @@ const Index = () => {
 
     setIsLoading(true);
     try {
-      // TODO: Implement actual API call to Gemini
-      // For demonstration, we'll simulate a response with points if in point mode
-      setTimeout(() => {
-        if (isPointMode) {
-          const mockResponse: AnalysisResponse = {
-            answer: "This is a simulated response with points. In a real implementation, this would be the response from the Gemini API analyzing the image and providing points of interest.",
-            points: [
-              { point: [300, 500], label: "Point of Interest 1" },
-              { point: [700, 200], label: "Point of Interest 2" },
-            ],
-          };
-          setResponse(mockResponse.answer);
-          setPoints(mockResponse.points || []);
-        } else {
-          setResponse(
-            "This is a simulated response. In a real implementation, this would be the response from the Gemini API analyzing the uploaded image based on your message."
-          );
-          setPoints([]);
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: modelName });
+
+      // Convert base64 image to File object
+      const base64Data = uploadedImage.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteArrays = [];
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteArrays.push(byteCharacters.charCodeAt(i));
+      }
+      const blob = new Blob([new Uint8Array(byteArrays)], { type: 'image/jpeg' });
+      const imageFile = new File([blob], 'image.jpg', { type: 'image/jpeg' });
+
+      // Prepare the prompt based on mode
+      let prompt = message;
+      if (isPointMode) {
+        prompt = `Answer the following question and point to relevant items in the image: '${message}'
+        Provide the answer in JSON format as follows:
+        {
+          "answer": "...",
+          "points": [{"point": [y, x], "label": "..."}],
         }
-        setIsLoading(false);
-      }, 2000);
+        The points are in [y, x] format normalized to 0-1000.`;
+      }
+
+      // Create chat session with configuration
+      const chat = model.startChat({
+        generationConfig: {
+          temperature: 1,
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 8192,
+        },
+        history: systemMessage ? [
+          {
+            role: "user",
+            parts: [{ text: systemMessage }],
+          }
+        ] : [],
+      });
+
+      // Send message with image
+      const result = await chat.sendMessage([
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType: "image/jpeg"
+          }
+        },
+        { text: prompt }
+      ]);
+
+      const responseText = await result.response.text();
+
+      if (isPointMode) {
+        try {
+          const parsedResponse = JSON.parse(responseText) as AnalysisResponse;
+          setResponse(parsedResponse.answer);
+          setPoints(parsedResponse.points || []);
+        } catch (error) {
+          console.error("Failed to parse points response:", error);
+          setResponse(responseText);
+          setPoints([]);
+          toast({
+            title: "Warning",
+            description: "Could not parse points from response. Displaying text only.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        setResponse(responseText);
+        setPoints([]);
+      }
     } catch (error) {
+      console.error("API Error:", error);
       toast({
         title: "Error",
         description: "An error occurred while processing your request.",
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };
