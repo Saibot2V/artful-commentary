@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
 
 export const Header = ({
   apiKey,
@@ -26,6 +27,20 @@ export const Header = ({
   systemMessage: string;
   setSystemMessage: (message: string) => void;
 }) => {
+  const { toast } = useToast();
+
+  const handleSave = () => {
+    // Save to localStorage
+    localStorage.setItem('reportcraft-api-key', apiKey);
+    localStorage.setItem('reportcraft-model-name', modelName);
+    localStorage.setItem('reportcraft-system-message', systemMessage);
+
+    toast({
+      title: "Settings saved",
+      description: "Your settings have been saved successfully.",
+    });
+  };
+
   return (
     <header className="w-full bg-gradient-to-r from-reportcraft-blue to-reportcraft-red p-4 text-white flex justify-between items-center">
       <h1 className="text-2xl font-bold">ReportCraft</h1>
@@ -71,6 +86,12 @@ export const Header = ({
                 placeholder="Enter system message"
               />
             </div>
+            <Button 
+              className="w-full mt-6" 
+              onClick={handleSave}
+            >
+              Save Settings
+            </Button>
           </div>
         </SheetContent>
       </Sheet>

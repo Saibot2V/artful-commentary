@@ -3,11 +3,12 @@ import { Header } from "@/components/Header";
 import { ImageUpload } from "@/components/ImageUpload";
 import { MessageInput } from "@/components/MessageInput";
 import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
-  const [apiKey, setApiKey] = useState("");
-  const [modelName, setModelName] = useState("gemini-2.0-flash-exp");
-  const [systemMessage, setSystemMessage] = useState("");
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('reportcraft-api-key') || "");
+  const [modelName, setModelName] = useState(() => localStorage.getItem('reportcraft-model-name') || "gemini-2.0-flash-exp");
+  const [systemMessage, setSystemMessage] = useState(() => localStorage.getItem('reportcraft-system-message') || "");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [response, setResponse] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
