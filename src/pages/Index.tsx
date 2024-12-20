@@ -4,6 +4,17 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { MessageInput } from "@/components/MessageInput";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
+import { ImageWithPoints } from "@/components/ImageWithPoints";
+
+interface Point {
+  point: [number, number];
+  label: string;
+}
+
+interface AnalysisResponse {
+  answer: string;
+  points?: Point[];
+}
 
 const Index = () => {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('reportcraft-api-key') || "");
@@ -11,7 +22,9 @@ const Index = () => {
   const [systemMessage, setSystemMessage] = useState(() => localStorage.getItem('reportcraft-system-message') || "");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [response, setResponse] = useState<string | null>(null);
+  const [points, setPoints] = useState<Point[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPointMode, setIsPointMode] = useState(false);
   const { toast } = useToast();
 
   const handleImageUpload = (file: File) => {
@@ -19,6 +32,7 @@ const Index = () => {
     reader.onloadend = () => {
       setUploadedImage(reader.result as string);
       setResponse(null);
+      setPoints([]);
     };
     reader.readAsDataURL(file);
   };
@@ -43,14 +57,36 @@ const Index = () => {
     }
 
     setIsLoading(true);
-    // TODO: Implement actual API call to Gemini
-    // For now, we'll simulate a response
-    setTimeout(() => {
-      setResponse(
-        "This is a simulated response. In a real implementation, this would be the response from the Gemini API analyzing the uploaded image based on your message."
-      );
+    try {
+      // TODO: Implement actual API call to Gemini
+      // For demonstration, we'll simulate a response with points if in point mode
+      setTimeout(() => {
+        if (isPointMode) {
+          const mockResponse: AnalysisResponse = {
+            answer: "This is a simulated response with points. In a real implementation, this would be the response from the Gemini API analyzing the image and providing points of interest.",
+            points: [
+              { point: [300, 500], label: "Point of Interest 1" },
+              { point: [700, 200], label: "Point of Interest 2" },
+            ],
+          };
+          setResponse(mockResponse.answer);
+          setPoints(mockResponse.points || []);
+        } else {
+          setResponse(
+            "This is a simulated response. In a real implementation, this would be the response from the Gemini API analyzing the uploaded image based on your message."
+          );
+          setPoints([]);
+        }
+        setIsLoading(false);
+      }, 2000);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An error occurred while processing your request.",
+        variant: "destructive",
+      });
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -85,18 +121,29 @@ const Index = () => {
             <h2 className="text-xl font-semibold mb-4">Upload Image</h2>
             {uploadedImage ? (
               <div className="relative">
-                <img
-                  src={uploadedImage}
-                  alt="Uploaded"
-                  className="w-full rounded-lg"
-                />
-                <Button
-                  variant="outline"
-                  className="mt-2"
-                  onClick={() => setUploadedImage(null)}
-                >
-                  Remove Image
-                </Button>
+                {points.length > 0 ? (
+                  <ImageWithPoints imageSrc={uploadedImage} points={points} />
+                ) : (
+                  <img
+                    src={uploadedImage}
+                    alt="Uploaded"
+                    className="w-full rounded-lg"
+                  />
+                )}
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setUploadedImage(null)}
+                  >
+                    Remove Image
+                  </Button>
+                  <Button
+                    variant={isPointMode ? "default" : "outline"}
+                    onClick={() => setIsPointMode(!isPointMode)}
+                  >
+                    {isPointMode ? "Ask and Point Mode" : "Normal Mode"}
+                  </Button>
+                </div>
               </div>
             ) : (
               <ImageUpload onImageUpload={handleImageUpload} />
